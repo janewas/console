@@ -1,9 +1,14 @@
-import { lazy, type ComponentType } from 'react'
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- safeLazy must preserve arbitrary component prop types from dynamic imports.
+type LazyImportableComponent = ComponentType<any>
 
 type LazyComponentModule<
   TExportName extends string,
-  TProps extends Record<string, unknown> = Record<string, unknown>,
-> = Record<TExportName, ComponentType<TProps>> & Record<string, unknown>
+  TComponent extends LazyImportableComponent,
+> = {
+  [TKey in TExportName]: TComponent
+}
 
 /** Maximum number of retry attempts before giving up on a failed dynamic import */
 const LAZY_IMPORT_MAX_RETRIES = 2
@@ -43,15 +48,15 @@ const LAZY_IMPORT_ATTEMPT_TIMEOUT_MS = 5_000
  */
 export function safeLazy<
   TExportName extends string,
-  TProps extends Record<string, unknown> = Record<string, unknown>,
+  TComponent extends LazyImportableComponent,
 >(
-  importFn: () => Promise<LazyComponentModule<TExportName, TProps>>,
+  importFn: () => Promise<LazyComponentModule<TExportName, TComponent>>,
   exportName: TExportName,
-): ReturnType<typeof lazy> {
+): LazyExoticComponent<TComponent> {
   return lazy(() => {
-    const importWithTimeout = (): Promise<LazyComponentModule<TExportName, TProps>> => {
+    const importWithTimeout = (): Promise<LazyComponentModule<TExportName, TComponent>> => {
       let timeoutId: ReturnType<typeof setTimeout> | undefined
-      const timeoutPromise = new Promise<LazyComponentModule<TExportName, TProps>>((_, reject) => {
+      const timeoutPromise = new Promise<LazyComponentModule<TExportName, TComponent>>((_, reject) => {
         timeoutId = setTimeout(() => {
           reject(
             new Error(
@@ -66,7 +71,7 @@ export function safeLazy<
       })
     }
 
-    const attemptImport = (retriesLeft: number): Promise<{ default: ComponentType<TProps> }> =>
+    const attemptImport = (retriesLeft: number): Promise<{ default: TComponent }> =>
       importWithTimeout()
         .then((m) => {
           // When an eagerly-loaded bundle uses .catch(() => undefined) to suppress
@@ -96,7 +101,7 @@ export function safeLazy<
               `[safeLazy] Import failed for "${exportName}" (${retriesLeft} retries left), ` +
               `retrying in ${delay}ms: ${err.message}`,
             )
-            return new Promise<{ default: ComponentType<TProps> }>((resolve) =>
+            return new Promise<{ default: TComponent }>((resolve) =>
               setTimeout(() => resolve(attemptImport(retriesLeft - 1)), delay),
             )
           }

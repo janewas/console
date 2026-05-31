@@ -1,7 +1,8 @@
 import type { Component, CSSProperties } from 'react'
 import type { EChartsCoreOption, EChartsInitOpts, EChartsType } from 'echarts/core'
 
-export type EChartsEventHandler = (...args: unknown[]) => void
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- ECharts event payloads vary by event name and the upstream API accepts arbitrary handler arguments.
+export type EChartsEventHandler = (...args: any[]) => void
 
 export interface EChartsModule {
   init: (dom: HTMLElement, theme?: string | object | null, opts?: EChartsInitOpts) => EChartsType
